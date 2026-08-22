@@ -413,7 +413,7 @@ footer { text-align: center; padding: 30px 20px 60px; color: var(--muted); font-
         <h4>学習のようす（ロス・チャート）</h4>
         <div class="statrow">
           <div class="stat"><span class="num" id="curLoss">--</span><span class="lbl">現在のロス</span></div>
-          <div class="stat"><span class="num" id="curStep">0</span><span class="lbl">/ 400 ステップ</span></div>
+          <div class="stat"><span class="num" id="curStep">0</span><span class="lbl">/ 800 ステップ</span></div>
         </div>
         <div class="canvaswrap">
           <canvas id="lossChart" class="demo" width="880" height="300"></canvas>
@@ -520,7 +520,7 @@ const TOK = {};
 for (let i = 0; i < VOCAB.length; i++) TOK[VOCAB[i]] = i;
 const TRAIN_TOKENS = Array.from(TRAIN_TEXT).map(c => TOK[c]);
 const V = VOCAB.length;
-const D = 32, H = 2, DH = 16, L = 2, TL = 12, BATCH = 4, EPS = 1e-5, STEPS = 400, LR0 = 1.5e-3;
+const D = 32, H = 2, DH = 16, L = 2, TL = 12, BATCH = 8, EPS = 1e-5, STEPS = 800, LR0 = 1.5e-3;
 
 function zeros(r, c) {
   const a = new Array(r);
@@ -982,6 +982,8 @@ let trainStep = 0;
 let lossHistory = [];
 let training = false;
 let lastSampleStep = -999;
+let autoStarted = false;
+let userStopped = false;
 
 const $ = id => document.getElementById(id);
 
@@ -1194,7 +1196,7 @@ function drawAttention() {
   $("attWarn").textContent = (skipped > 0 ? "ひらがな以外の文字は「空白」として表示しています。 " : "") +
     (extra ? "長いので最初の12文字だけ表示しています。 " : "");
   const fwd = forward(P, [toks]);
-  const probs = fwd.caches[layer].probs[0];
+  const probs = fwd.caches[layer].att.probs[0];
   const grid = [];
   if (headMode === "avg") {
     for (let i = 0; i < T; i++) {
@@ -1214,15 +1216,15 @@ function drawAttention() {
 
   const cv = $("attCanvas");
   const cell = 38, padL = 36, padT = 32;
-  const W = padL + T * cell + 10, H = padT + T * cell + 10;
+  const cw = padL + T * cell + 10, ch = padT + T * cell + 10;
   const dpr = window.devicePixelRatio || 1;
-  cv.width = W * dpr;
-  cv.height = H * dpr;
-  cv.style.width = W + "px";
-  cv.style.height = H + "px";
+  cv.width = cw * dpr;
+  cv.height = ch * dpr;
+  cv.style.width = cw + "px";
+  cv.style.height = ch + "px";
   const ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0, 0, cw, ch);
   ctx.font = "14px sans-serif";
   ctx.fillStyle = "#8fa3bd";
   ctx.textAlign = "center";
@@ -1235,7 +1237,7 @@ function drawAttention() {
   ctx.textAlign = "left";
   ctx.fillStyle = "#5b6b82";
   ctx.font = "11px sans-serif";
-  ctx.fillText("注目する側 →", padL, H - 2);
+  ctx.fillText("注目する側 →", padL, ch - 2);
   ctx.save();
   ctx.translate(8, padT + T * cell - 4);
   ctx.rotate(-Math.PI / 2);
@@ -1384,23 +1386,27 @@ function updateStatUI() {
 function doChunk() {
   if (!training) return;
   const CHUNK = 12;
-  for (let i = 0; i < CHUNK && training && trainStep < STEPS; i++) {
-    const { x, y } = sampleBatch();
-    const lr = LR0 * 0.5 * (1 + Math.cos(Math.PI * (trainStep + 1) / STEPS));
-    const fwd = forward(P, x);
-    const { G, loss } = backward(P, fwd, x, y);
-    const n = gradNorm(G);
-    if (n > 1) scaleGrads(G, 1 / n);
-    adamUpdate(P, G, m, vv, lr, trainStep + 1);
-    trainStep++;
-    lossHistory.push(loss);
+  try {
+    for (let i = 0; i < CHUNK && training && trainStep < STEPS; i++) {
+      const { x, y } = sampleBatch();
+      const lr = LR0 * 0.5 * (1 + Math.cos(Math.PI * (trainStep + 1) / STEPS));
+      const fwd = forward(P, x);
+      const { G, loss } = backward(P, fwd, x, y);
+      const n = gradNorm(G);
+      if (n > 1) scaleGrads(G, 1 / n);
+      adamUpdate(P, G, m, vv, lr, trainStep + 1);
+      trainStep++;
+      lossHistory.push(loss);
+    }
+    if (trainStep - lastSampleStep >= 80) {
+      lastSampleStep = trainStep;
+      addSampleLog();
+    }
+  } catch (e) {
+    console.error("学習処理でエラーが発生しました:", e);
   }
   updateStatUI();
   updateStatus();
-  if (trainStep - lastSampleStep >= 80) {
-    lastSampleStep = trainStep;
-    addSampleLog();
-  }
   if (trainStep >= STEPS) {
     training = false;
     $("btnStop").disabled = true;
@@ -1411,8 +1417,25 @@ function doChunk() {
   requestAnimationFrame(doChunk);
 }
 
+function startAutoTraining() {
+  if (autoStarted || userStopped || trainStep >= STEPS) return;
+  autoStarted = true;
+  training = true;
+  $("btnStop").disabled = false;
+  updateStatus();
+  requestAnimationFrame(doChunk);
+}
+
+function resumeTrainingIfNeeded() {
+  if (training && trainStep < STEPS && !document.hidden) {
+    requestAnimationFrame(doChunk);
+  }
+}
+
 function startTraining() {
   stopTraining();
+  userStopped = false;
+  autoStarted = true;
   P = initParams();
   m = {};
   vv = {};
@@ -1430,6 +1453,7 @@ function startTraining() {
 
 function stopTraining() {
   training = false;
+  userStopped = true;
   $("btnStop").disabled = true;
   updateStatus();
 }
@@ -1470,17 +1494,19 @@ $("attHead").addEventListener("change", drawAttention);
 $("tempRange").addEventListener("input", () => { $("tempVal").textContent = parseFloat($("tempRange").value).toFixed(2); });
 $("genSeed").addEventListener("keydown", ev => { if (ev.key === "Enter") doGenerate(); });
 
-updateEmbedding();
-updatePosition();
-drawAttention();
-updateStatUI();
-updateStatus();
-setTimeout(() => {
-  training = true;
-  $("btnStop").disabled = false;
-  updateStatus();
-  requestAnimationFrame(doChunk);
-}, 600);
+try { updateEmbedding(); } catch (e) { console.error("Embedding描画エラー:", e); }
+try { updatePosition(); } catch (e) { console.error("位置情報描画エラー:", e); }
+try { drawAttention(); } catch (e) { console.error("Attention描画エラー:", e); }
+try { updateStatUI(); } catch (e) { console.error("ロスチャート描画エラー:", e); }
+try { updateStatus(); } catch (e) { console.error("ステータス表示エラー:", e); }
+setTimeout(startAutoTraining, 600);
+setInterval(() => {
+  if (!autoStarted && !userStopped && trainStep < STEPS && document.readyState === "complete") {
+    startAutoTraining();
+  }
+}, 1000);
+window.addEventListener("pageshow", resumeTrainingIfNeeded);
+document.addEventListener("visibilitychange", resumeTrainingIfNeeded);
 </script>
 
 </body>
