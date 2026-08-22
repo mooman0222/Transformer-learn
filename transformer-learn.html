@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformerを触って学ぶ</title>
+<style>
+:root {
+  --bg: #0b0f17;
+  --card: #121a26;
+  --card2: #0f1620;
+  --line: #1e2a3a;
+  --text: #e8eef7;
+  --muted: #8fa3bd;
+  --accent1: #7c6cff;
+  --accent2: #22d3ee;
+  --good: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: radial-gradient(1100px 500px at 85% -5%, #18233d 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "BIZ UDGothic", Meiryo, sans-serif;
+  line-height: 1.8;
+  font-size: 16px;
+}
+main { max-width: 940px; margin: 0 auto; padding: 0 20px 80px; }
+h1, h2, h3 { line-height: 1.4; }
+h2 { font-size: 26px; margin-bottom: 6px; }
+p { margin: 10px 0; color: var(--muted); }
+b, strong { color: var(--text); }
+code { background: #1a2434; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-size: 0.9em; color: var(--accent2); }
+mark { background: rgba(124, 108, 255, 0.25); color: var(--text); padding: 0 4px; border-radius: 4px; }
+
+nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(11, 15, 23, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+nav .inner { max-width: 940px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; height: 54px; }
+nav .logo { font-weight: 700; color: var(--text); text-decoration: none; font-size: 15px; }
+nav .logo span { background: linear-gradient(90deg, var(--accent1), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+nav a.navlink { color: var(--muted); text-decoration: none; font-size: 13.5px; }
+nav a.navlink:hover { color: var(--accent2); }
+
+.hero { padding: 64px 0 36px; text-align: center; }
+.hero h1 { font-size: 40px; font-weight: 800; background: linear-gradient(90deg, #a78bfa, #22d3ee, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .sub { font-size: 17px; color: var(--muted); max-width: 640px; margin: 14px auto 22px; }
+.chip {
+  display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 16px; font-size: 13.5px; color: var(--muted); background: var(--card2);
+}
+.chip.done { color: var(--good); border-color: rgba(52, 211, 153, 0.4); }
+.chip.idle { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 30px;
+  margin: 26px 0;
+}
+.card .stepno {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--accent2);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 999px; padding: 3px 14px; margin-bottom: 14px;
+  background: rgba(34, 211, 238, 0.06);
+}
+.card .stepno em { font-style: normal; color: var(--muted); font-weight: 400; }
+.lead { font-size: 17px; color: var(--text); }
+.box {
+  background: var(--card2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px 20px; margin: 16px 0;
+}
+.box h4 { margin-bottom: 10px; font-size: 15px; color: var(--accent2); }
+.note { font-size: 13.5px; color: var(--muted); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+.flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; justify-content: center; margin: 20px 0 6px; }
+.flow .fstep {
+  background: var(--card2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 16px; text-align: center; flex: 1 1 140px; margin: 4px;
+}
+.flow .fstep b { display: block; font-size: 14.5px; margin-bottom: 4px; }
+.flow .fstep small { color: var(--muted); font-size: 12.5px; }
+.flow .arrow { align-self: center; color: var(--accent1); font-size: 20px; padding: 0 6px; }
+
+button.btn {
+  cursor: pointer; border: none; border-radius: 10px;
+  padding: 9px 20px; font-size: 15px; font-weight: 700; font-family: inherit;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  color: #fff; transition: filter 0.15s, transform 0.1s;
+}
+button.btn:hover { filter: brightness(1.15); }
+button.btn:active { transform: scale(0.98); }
+button.btn.ghost {
+  background: transparent; color: var(--accent2);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+}
+button.btn.ghost:hover { background: rgba(34, 211, 238, 0.08); }
+button.btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+
+input[type="text"], select {
+  background: #0d1520; color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 14px; font-size: 15px; font-family: inherit;
+}
+input[type="text"]:focus, select:focus { outline: 2px solid rgba(124, 108, 255, 0.5); border-color: var(--accent1); }
+input[type="range"] { accent-color: var(--accent1); width: 100%; }
+label.lbl { font-size: 13px; color: var(--muted); display: block; margin: 10px 0 4px; }
+
+.bars { display: flex; align-items: center; gap: 2px; height: 110px; padding: 8px 0; }
+.bar {
+  flex: 1 1 0; min-width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent2), var(--accent1));
+  opacity: 0.9;
+}
+.bar.neg { background: linear-gradient(180deg, var(--warn), #f59e0b); }
+.legendline { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.legendline i { display: inline-block; width: 14px; height: 8px; border-radius: 3px; margin-right: 6px; }
+
+canvas.demo {
+  display: block; max-width: 100%; height: auto;
+  background: #0c1320; border: 1px solid var(--line); border-radius: 12px;
+}
+.canvaswrap { overflow-x: auto; }
+.tooltip {
+  position: fixed; pointer-events: none; z-index: 100;
+  background: #1a2434; border: 1px solid var(--accent1);
+  color: var(--text); font-size: 12.5px; border-radius: 8px; padding: 4px 10px;
+  display: none; white-space: nowrap;
+}
+
+.statrow { display: flex; gap: 26px; flex-wrap: wrap; align-items: baseline; margin: 10px 0 6px; }
+.stat { display: flex; align-items: baseline; gap: 8px; }
+.stat .num { font-size: 30px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.stat .lbl { font-size: 13px; color: var(--muted); }
+
+.outputbox {
+  background: #0c1320; border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 22px; font-size: 20px; min-height: 60px; margin: 14px 0;
+  letter-spacing: 0.04em;
+}
+.outputbox .seed { color: var(--accent2); font-weight: 700; }
+.samplelog { font-size: 13px; color: var(--muted); }
+.samplelog div { margin: 3px 0; }
+.samplelog b { color: var(--accent1); font-weight: 700; }
+
+.rankrow { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 14px; }
+.rankrow .char { width: 30px; text-align: center; font-weight: 700; }
+.rankrow .track { flex: 1; background: #0d1520; border-radius: 6px; height: 12px; overflow: hidden; }
+.rankrow .fill { height: 100%; background: linear-gradient(90deg, var(--accent1), var(--accent2)); border-radius: 6px; }
+.rankrow .val { width: 64px; text-align: right; color: var(--muted); font-size: 12.5px; }
+
+ul.tips { margin: 8px 0 8px 22px; color: var(--muted); }
+ul.tips li { margin: 6px 0; }
+
+details { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 10px 0; }
+details summary { cursor: pointer; font-weight: 700; color: var(--text); }
+details p { margin: 8px 0 0; }
+
+footer { text-align: center; padding: 30px 20px 60px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+
+.qkv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+@media (max-width: 700px) { .qkv { grid-template-columns: 1fr; } }
+.qkv .box { margin: 0; }
+.qkv .box b { color: var(--accent2); }
+
+.warnnote { color: var(--warn); font-size: 13.5px; }
+.muted { color: var(--muted); }
+.flexrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a class="logo" href="#top">Transformer<span>を触って学ぶ</span></a>
+    <a class="navlink" href="#intro">はじめに</a>
+    <a class="navlink" href="#step1">Embedding</a>
+    <a class="navlink" href="#step2">位置情報</a>
+    <a class="navlink" href="#step3">Attention</a>
+    <a class="navlink" href="#step4">学習</a>
+    <a class="navlink" href="#glossary">用語集</a>
+  </div>
+</nav>
+
+<main id="top">
+
+  <header class="hero">
+    <h1>Transformerを触って学ぶ</h1>
+    <p class="sub">このページの中には、<b>本物のAI（ミニTransformer）</b>が入っています。<br>ブラウザ上で学習させて、じっさいに文字を生成させてみましょう。</p>
+    <span class="chip idle" id="statusChip">▶ モデル: 準備中…</span>
+    <div class="btnrow" style="justify-content:center">
+      <button class="btn" onclick="document.getElementById('intro').scrollIntoView()">はじめてみる</button>
+      <button class="btn ghost" onclick="document.getElementById('step4').scrollIntoView()">学習ページへジャンプ</button>
+    </div>
+  </header>
+
+  <section id="intro">
+    <div class="card">
+      <h2>AIって、なにをしているの?</h2>
+      <p class="lead">じつは「<mark>次に来る文字を予測する</mark>」ことをひたすらくり返しているだけ。それだけで文章が書けたり、会話ができたりするように見えるのです。</p>
+      <p>Transformerという仕組みは、この予測をできるようにするための<strong>「言葉の整理整頓」</strong>の方法です。大きく分けて4つのステップに分解できます。</p>
+      <div class="flow">
+        <div class="fstep"><b>① 言葉 → 数字</b><small>文字を数字のリストに変換</small></div>
+        <div class="arrow">→</div>
+        <div class="fstep"><b>② 順番を記録</b><small>場所ごとの数字を足す</small></div>
+        <div class="arrow">→</div>
+        <div class="fstep"><b>③ お互いに注目</b><small>「関連する文字」を強調</small></div>
+        <div class="arrow">→</div>
+        <div class="fstep"><b>④ 次を予測</b><small>いちばん自然な文字を選ぶ</small></div>
+      </div>
+      <p class="note">このページでは、この4ステップを1つずつ「触って」体験できます。数式はほとんど出てきません。文字と数字のイメージで考えてください。<br>処理はすべてあなたのブラウザの中で行われます。データはどこにも送信されません。</p>
+    </div>
+  </section>
+
+  <section id="step1">
+    <div class="card">
+      <div class="stepno">STEP 1 <em>／ 言葉を数字に変える</em></div>
+      <h2>Embedding（エンベディング）</h2>
+      <p class="lead">コンピュータは「ん」という文字をそのままでは扱えません。だから<mark>数字のリスト（ベクトル）</mark>に変換します。</p>
+      <p>このページのAIでは、1つの文字を<strong>32個の数字のリスト</strong>に変換します。下の棒グラフは、文字1つ分の「数字の形」です。棒の高さ = 数字の大きさです。</p>
+      <div class="grid2">
+        <div class="box">
+          <h4>文字A</h4>
+          <div class="flexrow">
+            <input type="text" id="embChar1" maxlength="2" value="ん" style="width:70px;text-align:center">
+            <button class="btn ghost" onclick="randomEmb(1)">ランダム</button>
+          </div>
+          <div class="bars" id="embBars1"></div>
+          <p class="note">「<span id="embLabel1">ん</span>」の数字リスト（32個）</p>
+        </div>
+        <div class="box">
+          <h4>文字B</h4>
+          <div class="flexrow">
+            <input type="text" id="embChar2" maxlength="2" value="に" style="width:70px;text-align:center">
+            <button class="btn ghost" onclick="randomEmb(2)">ランダム</button>
+          </div>
+          <div class="bars" id="embBars2"></div>
+          <p class="note">「<span id="embLabel2">に</span>」の数字リスト（32個）</p>
+        </div>
+      </div>
+      <div class="box">
+        <h4>似ている度（コサイン類似度）</h4>
+        <p>「数字の形が近い = 似ている」と考えます。形がピッタリ同じなら <b>1.0</b>、まったく無関係なら <b>0</b> に近くなります。</p>
+        <div class="statrow">
+          <div class="stat"><span class="num" id="embSim">--</span><span class="lbl">／ 1.0</span></div>
+        </div>
+        <p class="note" id="embSimNote"></p>
+      </div>
+      <div class="box">
+        <h4>「<span id="embRankFor">ん</span>」にいちばん似ている文字は?</h4>
+        <div id="embRank"></div>
+        <p class="note" id="embRankNote">学習が進むと、この「似ている」に意味が生まれます（例: よく同じ場所に出る文字どうしが似てくる）。</p>
+      </div>
+      <div class="box" style="border-color: rgba(251,191,36,0.3)">
+        <h4>ここがポイント</h4>
+        <p>「言葉を数字にする」ことの意味は、<strong>「似た言葉は数字も似た形になる」</strong>ようにできることです。人間の感覚で言えば「色」や「位置」のようなイメージ。これがAIの言葉の世界の地図になります。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="step2">
+    <div class="card">
+      <div class="stepno">STEP 2 <em>／ 順番を覚える</em></div>
+      <h2>位置エンコーディング</h2>
+      <p class="lead">「こんにちは」と「はちにんこ」は、<b>文字は同じでも意味がちがいます</b>。AIが順番を区別できるように、<mark>「場所ごとの数字」を足し算</mark>します。</p>
+      <p>昔からあるやり方は「サイン波」という波の形を使う方法。位置が1つ動くだけで、もらう数字が変わります。</p>
+      <div class="box">
+        <h4>波の形で位置を表す（イメージ）</h4>
+        <input type="range" id="posSlider" min="0" max="11" step="1" value="3" style="margin-bottom:6px">
+        <div class="canvaswrap">
+          <canvas id="posCanvas" class="demo" width="880" height="230"></canvas>
+        </div>
+        <p class="note">サイン波は「場所」ごとにちがう数字の組をくれる。だからAIは「今どこにいるか」がわかる。</p>
+      </div>
+      <div class="box">
+        <h4>ミニAIがじっさいに学習した「場所の数字」</h4>
+        <div class="canvaswrap">
+          <canvas id="wpeCanvas" class="demo" width="880" height="240"></canvas>
+        </div>
+        <p class="note">縦 = 場所（位置0〜11）、横 = 32個の数字。色が濃いほど値が大きい。現代のAIは、この表を<strong>自分で学習</strong>します。</p>
+      </div>
+      <div class="box">
+        <h4>ためしてみよう: 同じ文字でも場所が違うと数字が変わる</h4>
+        <div class="flexrow">
+          <div>
+            <label class="lbl">文字</label>
+            <input type="text" id="posChar" maxlength="2" value="ん" style="width:70px;text-align:center">
+          </div>
+          <div>
+            <label class="lbl">場所A</label>
+            <select id="posA"></select>
+          </div>
+          <div>
+            <label class="lbl">場所B</label>
+            <select id="posB"></select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div>
+            <div class="bars" id="posBarsA"></div>
+            <p class="note">場所Aの「ん」</p>
+          </div>
+          <div>
+            <div class="bars" id="posBarsB"></div>
+            <p class="note">場所Bの「ん」</p>
+          </div>
+        </div>
+        <p class="muted" id="posMsg"></p>
+      </div>
+      <div class="box" style="border-color: rgba(251,191,36,0.3)">
+        <h4>ここがポイント</h4>
+        <p>「文字の数字」と「場所の数字」を足すことで、<strong>「位置0の『ん』」と「位置5の『ん』」が別のものとして扱える</strong>ようになります。これで順番の情報がAIに入ります。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="step3">
+    <div class="card">
+      <div class="stepno">STEP 3 <em>／ お互いに注目する</em></div>
+      <h2>Attention（アテンション）</h2>
+      <p class="lead">文章の中で、ある文字が「他のどの文字と関係しているか」をAIが自分で見つける仕組みです。これを<mark>「注目度」</mark>と呼びます。</p>
+      <div class="qkv">
+        <div class="box">
+          <h4>Q = 質問票</h4>
+          <p class="note">今の文字が「周りの文字に何を聞きたいか」を表す。例:「私は『ん』。次にどんな文字が来るか、だれか知ってる?」</p>
+        </div>
+        <div class="box">
+          <h4>K = 自己紹介カード</h4>
+          <p class="note">他の文字が「自分は何者か」を表す。例:「私は『に』。言葉の途中によく出るよ」</p>
+        </div>
+        <div class="box">
+          <h4>V = 中身</h4>
+          <p class="note">注目した相手の「本当の内容」。注目度が高い相手ほど、その中身を多く取り込む</p>
+        </div>
+      </div>
+      <p>質問（Q）と自己紹介（K）が合うほど、その文字に<strong>強く注目</strong>します。注目度は0〜1の割合で表され、表（ヒートマップ）にすると一目でわかります。</p>
+      <div class="box">
+        <h4>ためしてみよう: 注目度ヒートマップ</h4>
+        <div class="flexrow">
+          <input type="text" id="attText" value="こんにちは みなさん" style="flex:1;min-width:220px">
+          <button class="btn" onclick="drawAttention()">注目を見る</button>
+        </div>
+        <div class="flexrow">
+          <div>
+            <label class="lbl">層（レイヤー）</label>
+            <select id="attLayer">
+              <option value="0">1層目</option>
+              <option value="1">2層目</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">ヘッド</label>
+            <select id="attHead">
+              <option value="avg">平均</option>
+              <option value="0">ヘッド0</option>
+              <option value="1">ヘッド1</option>
+            </select>
+          </div>
+          <div class="legendline" style="margin-top:28px">
+            <span><i style="background:#101826"></i>注目なし</span>
+            <span><i style="background:#22d3ee"></i>弱い</span>
+            <span><i style="background:#7c6cff"></i>強い</span>
+          </div>
+        </div>
+        <p class="warnnote" id="attWarn"></p>
+        <div class="canvaswrap">
+          <canvas id="attCanvas" class="demo"></canvas>
+        </div>
+        <p class="note">縦 = 「注目する側」、横 = 「注目される側」。色が濃いほど、その文字への注目度が高い。右上の三角は「未来の文字」で、まだ見えないので注目できない（これがTransformerの決まり）。</p>
+      </div>
+      <div class="box">
+        <h4>だれに注目している?</h4>
+        <div id="attTopList"></div>
+      </div>
+      <div class="box" style="border-color: rgba(251,191,36,0.3)">
+        <h4>ここがポイント</h4>
+        <p>学習前のAIは「注目」がデタラメです。学習すると、<strong>「ん」→「に」のような、文章のパターンに合う注目</strong>を身につけます。AttentionこそがTransformerの心臓部です。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="step4">
+    <div class="card">
+      <div class="stepno">STEP 4 <em>／ ミニAIを育てる</em></div>
+      <h2>学習 = 予測して、まちがえたら直す</h2>
+      <p class="lead">いよいよ全部をつなげます。このAIは、<mark>「文章の続きの文字」を予測</mark>することを練習します。</p>
+      <p>やり方はかんたん。<b>① 予測する → ② 答え合わせ（ロスを計算） → ③ 少しだけ直す → くり返す</b>。この「③ 直す」を何千回もやると、次第にそれらしい文章を出せるようになります。ロス（損失）は「予測の外れ具合」。<strong>小さいほど賢い</strong>です。</p>
+      <div class="box">
+        <h4>学習のようす（ロス・チャート）</h4>
+        <div class="statrow">
+          <div class="stat"><span class="num" id="curLoss">--</span><span class="lbl">現在のロス</span></div>
+          <div class="stat"><span class="num" id="curStep">0</span><span class="lbl">/ 800 ステップ</span></div>
+        </div>
+        <div class="canvaswrap">
+          <canvas id="lossChart" class="demo" width="880" height="300"></canvas>
+        </div>
+        <p class="note" id="lossChartNote">点線は「デタラメ予測」のライン（文字を全部あてずっぽうで選んだときのロス）。この線より下に行けば行くほど、実際にパターンを覚えています。</p>
+        <div class="btnrow">
+          <button class="btn" id="btnTrain" onclick="startTraining()">もう一度 最初から学習する</button>
+          <button class="btn ghost" id="btnStop" onclick="stopTraining()" disabled>学習を止める</button>
+        </div>
+      </div>
+      <div class="box">
+        <h4>学習中のひらめき（途中で生成させた文章）</h4>
+        <div class="samplelog" id="sampleLog"><div class="muted">学習を始めると、ここに「その時点の実力」が記録されます。</div></div>
+      </div>
+      <div class="box">
+        <h4>生成してみよう</h4>
+        <div class="flexrow">
+          <div style="flex:1;min-width:200px">
+            <label class="lbl">はじまりの文字（ひらがな）</label>
+            <input type="text" id="genSeed" value="こんにちは" style="width:100%">
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label class="lbl">温度（= 冒険度）: <b id="tempVal">0.7</b></label>
+            <input type="range" id="tempRange" min="0.2" max="1.5" step="0.05" value="0.7">
+          </div>
+        </div>
+        <p class="note">温度が低いと「堅実な」答え、高いと「自由奔放な」答えになります。</p>
+        <div class="btnrow">
+          <button class="btn" onclick="doGenerate()">生成する</button>
+          <button class="btn ghost" onclick="doGenerate(true)">もう1回 生成する</button>
+        </div>
+        <div class="outputbox" id="genOutput">（ここに生成された文章が出ます）</div>
+        <p class="note" id="genNote"></p>
+      </div>
+      <div class="box" style="border-color: rgba(251,191,36,0.3)">
+        <h4>ここがポイント</h4>
+        <p>ロスが下がる = 予測が当たるようになる = 賢くなっている。<strong>ChatGPTなどの本物のAIも、この「文字の予測」を、ものすごい量の文章で、ものすごい回数くり返しただけ</strong>です。しくみは同じ、規模がちがうだけ。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="summary">
+    <div class="card">
+      <h2>まとめ: Transformerの3つのおさらい</h2>
+      <ul class="tips">
+        <li><strong>言葉は数字に変わる</strong>（Embedding）。似た言葉は似た数字になる。</li>
+        <li><strong>順番は「場所の数字」で区別する</strong>。同じ文字でも場所が違えば別のもの。</li>
+        <li><strong>Attentionで「関係」を学ぶ</strong>。そして「次の文字」を予測する練習をくり返すと、AIは賢くなっていく。</li>
+      </ul>
+      <p class="note">このページのミニAIは約3万個のパラメータ（つまみ）を持っています。ChatGPTクラスは数千億個。でも基本のしくみは同じです。</p>
+    </div>
+  </section>
+
+  <section id="glossary">
+    <div class="card">
+      <h2>用語集</h2>
+      <details open>
+        <summary>トークン</summary>
+        <p>文章を切り分けた「最小のかけら」。日本語なら文字1つ単位が多い。AIはトークンの列として文章を見る。</p>
+      </details>
+      <details>
+        <summary>ベクトル</summary>
+        <p>数字のリスト。このページのAIでは1トークン = 32個の数字。棒グラフで「形」として見える。</p>
+      </details>
+      <details>
+        <summary>パラメータ</summary>
+        <p>学習によって調整される「つまみ」。このページのAIは約3万個。つまみの調整が「学習」そのもの。</p>
+      </details>
+      <details>
+        <summary>ロス（損失）</summary>
+        <p>予測の外れ具合を表す数字。小さいほど予測が当たっていて「賢い」。</p>
+      </details>
+      <details>
+        <summary>温度（temperature）</summary>
+        <p>文章生成のときのランダムさの調整。低い = 堅実・同じ答えになりやすい。高い = 自由・意外な答えになりやすい。</p>
+      </details>
+      <details>
+        <summary>Attention（アテンション）</summary>
+        <p>各トークンが他のトークンにどれだけ注目するかを計算する仕組み。Transformerの名前の由来にもなった心臓部。</p>
+      </details>
+      <details>
+        <summary>Transformer</summary>
+        <p>「Attention」を中心にしたAIの仕組み。2017年に登場し、いまの生成AI（ChatGPTなど）の土台になっている。</p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Transformerを触って学ぶ — 1つのHTMLファイルだけで動いています。保存すればオフラインでも使えます。<br>
+  処理はすべてあなたのブラウザ内で行われ、データはどこにも送信されません。
+</footer>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script id="model-script">
+"use strict";
+
+const TRAIN_TEXT = "おはよう こんにちは こんばんは おやすみ おはよう こんにちは こんばんは おやすみ ありがとう さようなら ありがとう さようなら すごい たのしい うれしい すごい たのしい うれしい がんばれ がんばって やったね なるほど どうして がんばれ がんばって やったね なるほど どうして きょうは あしたは たのしい きょうは あしたは すごい おいしい うれしい さようなら";
+
+const VOCAB = Array.from(new Set(Array.from(TRAIN_TEXT))).sort();
+const TOK = {};
+for (let i = 0; i < VOCAB.length; i++) TOK[VOCAB[i]] = i;
+const TRAIN_TOKENS = Array.from(TRAIN_TEXT).map(c => TOK[c]);
+const V = VOCAB.length;
+const D = 32, H = 2, DH = 16, L = 2, TL = 12, BATCH = 8, EPS = 1e-5, STEPS = 800, LR0 = 1.5e-3;
+
+function zeros(r, c) {
+  const a = new Array(r);
+  for (let i = 0; i < r; i++) a[i] = new Float64Array(c);
+  return a;
+}
+function zeros3(B, T, d) {
+  const a = new Array(B);
+  for (let bb = 0; bb < B; bb++) {
+    a[bb] = new Array(T);
+    for (let t = 0; t < T; t++) a[bb][t] = new Float64Array(d);
+  }
+  return a;
+}
+function randn(r, c, s) {
+  const a = zeros(r, c);
+  for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) {
+    let u = Math.random(), v = Math.random();
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    a[i][j] = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * s;
+  }
+  return a;
+}
+function matmul(A, B) {
+  const r = A.length, n = B.length, c = B[0].length;
+  const C = zeros(r, c);
+  for (let i = 0; i < r; i++) {
+    const Ai = A[i], Ci = C[i];
+    for (let k = 0; k < n; k++) {
+      const aik = Ai[k], Bk = B[k];
+      for (let j = 0; j < c; j++) Ci[j] += aik * Bk[j];
+    }
+  }
+  return C;
+}
+function matmulT(A, B) {
+  const r = A.length, n = A[0].length, c = B.length;
+  const C = zeros(r, c);
+  for (let i = 0; i < r; i++) {
+    const Ai = A[i], Ci = C[i];
+    for (let k = 0; k < n; k++) {
+      const aik = Ai[k];
+      for (let j = 0; j < c; j++) Ci[j] += aik * B[j][k];
+    }
+  }
+  return C;
+}
+function matmul3(A, B) {
+  const Bn = A.length, T = A[0].length, m = B[0].length;
+  const C = zeros3(Bn, T, m);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const Ai = A[bb][t], Ci = C[bb][t];
+    for (let k = 0; k < B.length; k++) {
+      const aik = Ai[k], Bk = B[k];
+      for (let j = 0; j < m; j++) Ci[j] += aik * Bk[j];
+    }
+  }
+  return C;
+}
+function matmul3T(A, B) {
+  const Bn = A.length, T = A[0].length, k = A[0][0].length, m = B.length;
+  const C = zeros3(Bn, T, m);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const Ai = A[bb][t], Ci = C[bb][t];
+    for (let kk = 0; kk < k; kk++) {
+      const aik = Ai[kk];
+      for (let j = 0; j < m; j++) Ci[j] += aik * B[j][kk];
+    }
+  }
+  return C;
+}
+function addMat3(A, B) {
+  const Bn = A.length, T = A[0].length, d = A[0][0].length;
+  const C = zeros3(Bn, T, d);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++)
+    for (let i = 0; i < d; i++) C[bb][t][i] = A[bb][t][i] + B[bb][t][i];
+  return C;
+}
+function addBias3(A, b) {
+  for (let bb = 0; bb < A.length; bb++) for (let t = 0; t < A[bb].length; t++) {
+    const row = A[bb][t];
+    for (let j = 0; j < b.length; j++) row[j] += b[j];
+  }
+}
+function reluInPlace3(A) {
+  for (let bb = 0; bb < A.length; bb++) for (let t = 0; t < A[bb].length; t++) {
+    const row = A[bb][t];
+    for (let j = 0; j < row.length; j++) if (row[j] < 0) row[j] = 0;
+  }
+}
+function outerSum(a, b) {
+  const Bn = a.length, T = a[0].length, n = a[0][0].length, m = b[0][0].length;
+  const C = zeros(n, m);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const ai = a[bb][t], bi = b[bb][t];
+    for (let i = 0; i < n; i++) {
+      const Ci = C[i], aiv = ai[i];
+      for (let j = 0; j < m; j++) Ci[j] += aiv * bi[j];
+    }
+  }
+  return C;
+}
+function sumOverBT(a) {
+  const Bn = a.length, T = a[0].length, m = a[0][0].length;
+  const C = new Float64Array(m);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const row = a[bb][t];
+    for (let j = 0; j < m; j++) C[j] += row[j];
+  }
+  return C;
+}
+function layernorm(x, g, b) {
+  const Bn = x.length, T = x[0].length, d = x[0][0].length;
+  const y = new Array(Bn), means = zeros(Bn, T), invs = zeros(Bn, T);
+  for (let bb = 0; bb < Bn; bb++) {
+    y[bb] = new Array(T);
+    for (let t = 0; t < T; t++) {
+      const row = x[bb][t];
+      let m = 0;
+      for (let i = 0; i < d; i++) m += row[i];
+      m /= d;
+      let v = 0;
+      for (let i = 0; i < d; i++) v += (row[i] - m) * (row[i] - m);
+      v /= d;
+      const inv = 1 / Math.sqrt(v + EPS);
+      means[bb][t] = m;
+      invs[bb][t] = inv;
+      const yrow = new Float64Array(d);
+      for (let i = 0; i < d; i++) yrow[i] = (row[i] - m) * inv * g[i] + b[i];
+      y[bb][t] = yrow;
+    }
+  }
+  return { y, means, invs };
+}
+function layernormBackward(dy, x, g, b, means, invs) {
+  const Bn = x.length, T = x[0].length, d = x[0][0].length;
+  const dx = zeros3(Bn, T, d);
+  const dg = new Float64Array(d), db = new Float64Array(d);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const m = means[bb][t], inv = invs[bb][t];
+    let sdy = 0, sdyx = 0;
+    for (let i = 0; i < d; i++) {
+      sdy += dy[bb][t][i];
+      sdyx += dy[bb][t][i] * (x[bb][t][i] - m);
+    }
+    const dv = -0.5 * inv * inv * inv * sdyx;
+    const dmu = -inv * sdy;
+    for (let i = 0; i < d; i++) {
+      const xhat = (x[bb][t][i] - m) * inv;
+      dx[bb][t][i] = dy[bb][t][i] * g[i] * inv + dv * 2 * (x[bb][t][i] - m) / d + dmu / d;
+      dg[i] += dy[bb][t][i] * xhat;
+      db[i] += dy[bb][t][i];
+    }
+  }
+  return { dx, dg, db };
+}
+function attentionForward(q, k, v, T) {
+  const Bn = q.length, d = q[0][0].length;
+  const out = zeros3(Bn, T, d);
+  const probs = new Array(Bn);
+  const scale = 1 / Math.sqrt(DH);
+  for (let bb = 0; bb < Bn; bb++) {
+    probs[bb] = new Array(H);
+    for (let hd = 0; hd < H; hd++) {
+      const off = hd * DH;
+      const P = zeros(T, T);
+      probs[bb][hd] = P;
+      for (let t = 0; t < T; t++) {
+        const scores = new Float64Array(t + 1);
+        for (let t2 = 0; t2 <= t; t2++) {
+          let s = 0;
+          for (let i = 0; i < DH; i++) s += q[bb][t][off + i] * k[bb][t2][off + i];
+          scores[t2] = s * scale;
+        }
+        let mx = -Infinity;
+        for (let t2 = 0; t2 <= t; t2++) mx = Math.max(mx, scores[t2]);
+        let sm = 0;
+        for (let t2 = 0; t2 <= t; t2++) { scores[t2] = Math.exp(scores[t2] - mx); sm += scores[t2]; }
+        for (let t2 = 0; t2 <= t; t2++) P[t][t2] = scores[t2] / sm;
+        for (let j = 0; j < DH; j++) {
+          let o = 0;
+          for (let t2 = 0; t2 <= t; t2++) o += P[t][t2] * v[bb][t2][off + j];
+          out[bb][t][off + j] += o;
+        }
+      }
+    }
+  }
+  return { out, probs };
+}
+function attentionBackward(dout, q, k, v, probs, T) {
+  const Bn = q.length, d = q[0][0].length;
+  const dq = zeros3(Bn, T, d), dk = zeros3(Bn, T, d), dv = zeros3(Bn, T, d);
+  const scale = 1 / Math.sqrt(DH);
+  for (let bb = 0; bb < Bn; bb++) for (let hd = 0; hd < H; hd++) {
+    const off = hd * DH;
+    const P = probs[bb][hd];
+    for (let t = 0; t < T; t++) {
+      const dP = new Float64Array(t + 1);
+      for (let t2 = 0; t2 <= t; t2++) {
+        let s = 0;
+        for (let j = 0; j < DH; j++) s += dout[bb][t][off + j] * v[bb][t2][off + j];
+        dP[t2] = s;
+      }
+      let total = 0;
+      for (let t2 = 0; t2 <= t; t2++) total += P[t][t2] * dP[t2];
+      for (let t2 = 0; t2 <= t; t2++) {
+        const ds = (dP[t2] - total) * P[t][t2] * scale;
+        for (let i = 0; i < DH; i++) {
+          dq[bb][t][off + i] += ds * k[bb][t2][off + i];
+          dk[bb][t2][off + i] += ds * q[bb][t][off + i];
+        }
+      }
+    }
+    for (let t2 = 0; t2 < T; t2++) for (let t = t2; t < T; t++) {
+      const w = P[t][t2];
+      for (let j = 0; j < DH; j++) dv[bb][t2][off + j] += w * dout[bb][t][off + j];
+    }
+  }
+  return { dq, dk, dv };
+}
+function initParams() {
+  const P = {};
+  P.wte = randn(V, D, 0.1);
+  P.wpe = randn(TL, D, 0.02);
+  P.blocks = [];
+  for (let l = 0; l < L; l++) {
+    P.blocks.push({
+      ln1_g: Float64Array.from({ length: D }, () => 1), ln1_b: new Float64Array(D),
+      wq: randn(D, D, 0.1), wk: randn(D, D, 0.1), wv: randn(D, D, 0.1), wo: randn(D, D, 0.1),
+      ln2_g: Float64Array.from({ length: D }, () => 1), ln2_b: new Float64Array(D),
+      w1: randn(D, 4 * D, 0.1), b1: new Float64Array(4 * D),
+      w2: randn(4 * D, D, 0.1), b2: new Float64Array(D)
+    });
+  }
+  P.lnf_g = Float64Array.from({ length: D }, () => 1);
+  P.lnf_b = new Float64Array(D);
+  P.wcls = randn(D, V, 0.02);
+  return P;
+}
+function forward(P, x) {
+  const Bn = x.length, T = x[0].length;
+  let h = zeros3(Bn, T, D);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const src = P.wte[x[bb][t]], pe = P.wpe[t], row = h[bb][t];
+    for (let i = 0; i < D; i++) row[i] = src[i] + pe[i];
+  }
+  const caches = [];
+  for (let l = 0; l < L; l++) {
+    const bl = P.blocks[l];
+    const hIn = h;
+    const ln1 = layernorm(h, bl.ln1_g, bl.ln1_b);
+    const q = matmul3(ln1.y, bl.wq);
+    const k = matmul3(ln1.y, bl.wk);
+    const v = matmul3(ln1.y, bl.wv);
+    const att = attentionForward(q, k, v, T);
+    const ao = matmul3(att.out, bl.wo);
+    const h1 = addMat3(h, ao);
+    const ln2 = layernorm(h1, bl.ln2_g, bl.ln2_b);
+    const f1 = matmul3(ln2.y, bl.w1);
+    addBias3(f1, bl.b1);
+    reluInPlace3(f1);
+    const f2 = matmul3(f1, bl.w2);
+    addBias3(f2, bl.b2);
+    const h2 = addMat3(h1, f2);
+    caches.push({ hIn, ln1, q, k, v, att, ao, h1, ln2, f1, f2, h2 });
+    h = h2;
+  }
+  const lnf = layernorm(h, P.lnf_g, P.lnf_b);
+  const logits = matmul3(lnf.y, P.wcls);
+  return { logits, lnf, hIn: h, caches };
+}
+function backward(P, fwd, x, y) {
+  const Bn = x.length, T = x[0].length;
+  const logits = fwd.logits;
+  const dlogits = zeros3(Bn, T, V);
+  let loss = 0;
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const row = logits[bb][t], drow = dlogits[bb][t];
+    let mx = -Infinity;
+    for (let i = 0; i < V; i++) mx = Math.max(mx, row[i]);
+    let sm = 0;
+    for (let i = 0; i < V; i++) { drow[i] = Math.exp(row[i] - mx); sm += drow[i]; }
+    for (let i = 0; i < V; i++) drow[i] /= sm;
+    loss += -Math.log(drow[y[bb][t]] + 1e-9);
+    drow[y[bb][t]] -= 1;
+  }
+  loss /= Bn * T;
+  const sc = 1 / (Bn * T);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const drow = dlogits[bb][t];
+    for (let i = 0; i < V; i++) drow[i] *= sc;
+  }
+  const G = {};
+  const dlnfY = matmul3T(dlogits, P.wcls);
+  G.wcls = outerSum(fwd.lnf.y, dlogits);
+  let lng = layernormBackward(dlnfY, fwd.hIn, P.lnf_g, P.lnf_b, fwd.lnf.means, fwd.lnf.invs);
+  G.lnf_g = lng.dg;
+  G.lnf_b = lng.db;
+  let dh = lng.dx;
+  G.blocks = new Array(L);
+  for (let l = L - 1; l >= 0; l--) {
+    const bl = P.blocks[l], c = fwd.caches[l];
+    const Gb = G.blocks[l] = {};
+    const df2 = dh;
+    Gb.w2 = outerSum(c.f1, df2);
+    Gb.b2 = sumOverBT(df2);
+    const df1 = matmul3T(df2, bl.w2);
+    for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+      const f1row = c.f1[bb][t], drow = df1[bb][t];
+      for (let i = 0; i < 4 * D; i++) if (f1row[i] <= 0) drow[i] = 0;
+    }
+    Gb.w1 = outerSum(c.ln2.y, df1);
+    Gb.b1 = sumOverBT(df1);
+    const dln2Y = matmul3T(df1, bl.w1);
+    const lng2 = layernormBackward(dln2Y, c.h1, bl.ln2_g, bl.ln2_b, c.ln2.means, c.ln2.invs);
+    Gb.ln2_g = lng2.dg;
+    Gb.ln2_b = lng2.db;
+    const dh1 = addMat3(lng2.dx, dh);
+    Gb.wo = outerSum(c.att.out, dh1);
+    const datt = matmul3T(dh1, bl.wo);
+    const attB = attentionBackward(datt, c.q, c.k, c.v, c.att.probs, T);
+    Gb.wq = outerSum(c.ln1.y, attB.dq);
+    Gb.wk = outerSum(c.ln1.y, attB.dk);
+    Gb.wv = outerSum(c.ln1.y, attB.dv);
+    const dln1Y = addMat3(addMat3(matmul3T(attB.dq, bl.wq), matmul3T(attB.dk, bl.wk)), matmul3T(attB.dv, bl.wv));
+    const lng1 = layernormBackward(dln1Y, c.hIn, bl.ln1_g, bl.ln1_b, c.ln1.means, c.ln1.invs);
+    Gb.ln1_g = lng1.dg;
+    Gb.ln1_b = lng1.db;
+    dh = lng1.dx;
+  }
+  G.wte = zeros(V, D);
+  G.wpe = zeros(TL, D);
+  for (let bb = 0; bb < Bn; bb++) for (let t = 0; t < T; t++) {
+    const row = dh[bb][t];
+    for (let i = 0; i < D; i++) {
+      G.wte[x[bb][t]][i] += row[i];
+      G.wpe[t][i] += row[i];
+    }
+  }
+  return { G, loss };
+}
+function visitArray(a, fn) {
+  for (let i = 0; i < a.length; i++) {
+    if (typeof a[i] === "number") fn(a[i], null, i);
+    else for (let j = 0; j < a[i].length; j++) fn(a[i][j], i, j);
+  }
+}
+function visitGrads(G, fn) {
+  for (const key in G) {
+    if (key === "blocks") {
+      for (const Gb of G.blocks) for (const k in Gb) visitArray(Gb[k], fn);
+    } else visitArray(G[key], fn);
+  }
+}
+function scaleGrads(G, s) {
+  for (const key in G) {
+    if (key === "blocks") {
+      for (const Gb of G.blocks) for (const k in Gb) scaleArr(Gb[k], s);
+    } else scaleArr(G[key], s);
+  }
+}
+function scaleArr(a, s) {
+  for (let i = 0; i < a.length; i++) {
+    if (typeof a[i] === "number") a[i] *= s;
+    else { const row = a[i]; for (let j = 0; j < row.length; j++) row[j] *= s; }
+  }
+}
+function gradNorm(G) {
+  let tot = 0;
+  visitGrads(G, v => { tot += v * v; });
+  return Math.sqrt(tot);
+}
+function adamUpdate(P, G, m, vv, lr, step) {
+  const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+  const c1 = 1 - Math.pow(b1, step), c2 = 1 - Math.pow(b2, step);
+  const pairs = [
+    ["wte", P.wte, G.wte], ["wpe", P.wpe, G.wpe], ["wcls", P.wcls, G.wcls],
+    ["lnf_g", P.lnf_g, G.lnf_g], ["lnf_b", P.lnf_b, G.lnf_b]
+  ];
+  for (let l = 0; l < L; l++) {
+    const bl = P.blocks[l], Gb = G.blocks[l];
+    for (const key of ["ln1_g", "ln1_b", "wq", "wk", "wv", "wo", "ln2_g", "ln2_b", "w1", "b1", "w2", "b2"]) {
+      pairs.push(["b" + l + "_" + key, bl[key], Gb[key]]);
+    }
+  }
+  for (const pair of pairs) {
+    const name = pair[0], p = pair[1], g = pair[2];
+    if (p.length > 0 && typeof p[0] !== "number") {
+      const r = p.length, c = p[0].length;
+      if (!m[name]) { m[name] = zeros(r, c); vv[name] = zeros(r, c); }
+      const mm = m[name], vvv = vv[name];
+      for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) {
+        mm[i][j] = b1 * mm[i][j] + (1 - b1) * g[i][j];
+        vvv[i][j] = b2 * vvv[i][j] + (1 - b2) * g[i][j] * g[i][j];
+        p[i][j] -= lr * (mm[i][j] / c1) / (Math.sqrt(vvv[i][j] / c2) + eps);
+      }
+    } else {
+      const n = p.length;
+      if (!m[name]) { m[name] = new Float64Array(n); vv[name] = new Float64Array(n); }
+      const mm = m[name], vvv = vv[name];
+      for (let i = 0; i < n; i++) {
+        mm[i] = b1 * mm[i] + (1 - b1) * g[i];
+        vvv[i] = b2 * vvv[i] + (1 - b2) * g[i] * g[i];
+        p[i] -= lr * (mm[i] / c1) / (Math.sqrt(vvv[i] / c2) + eps);
+      }
+    }
+  }
+}
+function sampleBatch() {
+  const x = [], y = [];
+  for (let b = 0; b < BATCH; b++) {
+    const s = Math.floor(Math.random() * (TRAIN_TOKENS.length - TL - 1));
+    const xi = [], yi = [];
+    for (let t = 0; t < TL; t++) { xi.push(TRAIN_TOKENS[s + t]); yi.push(TRAIN_TOKENS[s + t + 1]); }
+    x.push(xi);
+    y.push(yi);
+  }
+  return { x, y };
+}
+function generate(P, seed, n, temp) {
+  const seq = seed.slice();
+  while (seq.length < TL) seq.unshift(TOK[" "]);
+  const out = seed.slice();
+  for (let i = 0; i < n; i++) {
+    const inp = seq.slice(seq.length - TL);
+    const fwd = forward(P, [inp]);
+    const row = fwd.logits[0][TL - 1];
+    let mx = -Infinity;
+    for (let j = 0; j < V; j++) mx = Math.max(mx, row[j] / temp);
+    const probs = new Float64Array(V);
+    let sm = 0;
+    for (let j = 0; j < V; j++) { probs[j] = Math.exp(row[j] / temp - mx); sm += probs[j]; }
+    let r = Math.random() * sm;
+    let ch = V - 1;
+    for (let j = 0; j < V; j++) { r -= probs[j]; if (r <= 0) { ch = j; break; } }
+    seq.push(ch);
+    out.push(ch);
+  }
+  return out.map(i => VOCAB[i]).join("");
+}
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
+}
+</script>
+
+<script>
+"use strict";
+
+let P = initParams();
+let m = {}, vv = {};
+let trainStep = 0;
+let lossHistory = [];
+let training = false;
+let lastSampleStep = -999;
+
+const $ = id => document.getElementById(id);
+
+function updateStatus() {
+  const chip = $("statusChip");
+  const cur = lossHistory.length ? lossHistory[lossHistory.length - 1] : null;
+  if (training) {
+    chip.className = "chip";
+    chip.textContent = "⚙ 学習中… ロス " + (cur !== null ? cur.toFixed(2) : "--");
+  } else if (trainStep >= STEPS) {
+    chip.className = "chip done";
+    chip.textContent = "✓ 学習完了（ロス " + (cur !== null ? cur.toFixed(2) : "--") + "）";
+  } else {
+    chip.className = "chip idle";
+    chip.textContent = "▶ モデル: 学習待ち";
+  }
+}
+
+function renderBars(id, vec, vmax) {
+  const box = $(id);
+  box.innerHTML = "";
+  for (let i = 0; i < vec.length; i++) {
+    const d = document.createElement("div");
+    d.className = "bar" + (vec[i] < 0 ? " neg" : "");
+    const h = Math.max(3, Math.round(Math.abs(vec[i]) / vmax * 100));
+    d.style.height = h + "%";
+    d.title = vec[i].toFixed(3);
+    box.appendChild(d);
+  }
+}
+
+function randomEmb(which) {
+  let ch = VOCAB[Math.floor(Math.random() * (VOCAB.length - 1)) + 1];
+  $(which === 1 ? "embChar1" : "embChar2").value = ch;
+  updateEmbedding();
+}
+
+function updateEmbedding() {
+  const c1 = Array.from($("embChar1").value)[0] || "ん";
+  const c2 = Array.from($("embChar2").value)[0] || "に";
+  const id1 = TOK[c1], id2 = TOK[c2];
+  $("embLabel1").textContent = c1;
+  $("embLabel2").textContent = c2;
+  $("embRankFor").textContent = c1;
+  if (id1 === undefined || id2 === undefined) {
+    $("embSim").textContent = "--";
+    $("embSimNote").textContent = "この文字は学習データにないので、代わりに「空白」として表示しています。ひらがなで入力してみてね。";
+    return;
+  }
+  const v1 = P.wte[id1], v2 = P.wte[id2];
+  let vmax = 1e-9;
+  for (let i = 0; i < D; i++) vmax = Math.max(vmax, Math.abs(v1[i]), Math.abs(v2[i]));
+  renderBars("embBars1", v1, vmax);
+  renderBars("embBars2", v2, vmax);
+  const sim = cosine(v1, v2);
+  $("embSim").textContent = sim.toFixed(2);
+  const trained = trainStep >= STEPS;
+  $("embSimNote").textContent = trained
+    ? "学習済み！ この数値には「文字の使われ方の似ている度」が現れています。"
+    : "まだ学習中なので、この数字はデタラメに近いです。学習が進むと意味が出てきます。";
+  const ranked = [];
+  for (const ch of VOCAB) {
+    if (ch === " " || ch === c1) continue;
+    ranked.push([ch, cosine(v1, P.wte[TOK[ch]])]);
+  }
+  ranked.sort((a, b) => b[1] - a[1]);
+  const box = $("embRank");
+  box.innerHTML = "";
+  for (let i = 0; i < Math.min(5, ranked.length); i++) {
+    const row = document.createElement("div");
+    row.className = "rankrow";
+    const w = Math.max(4, Math.round(Math.max(0, ranked[i][1]) * 100));
+    row.innerHTML = '<span class="char">' + ranked[i][0] + '</span>' +
+      '<div class="track"><div class="fill" style="width:' + w + '%"></div></div>' +
+      '<span class="val">' + ranked[i][1].toFixed(2) + '</span>';
+    box.appendChild(row);
+  }
+}
+
+const POS_OPTIONS = [];
+for (let i = 0; i < TL; i++) POS_OPTIONS.push('<option value="' + i + '">位置' + i + '</option>');
+$("posA").innerHTML = POS_OPTIONS.join("");
+$("posB").innerHTML = POS_OPTIONS.join("");
+$("posA").value = 0;
+$("posB").value = 5;
+
+function drawPosCurves() {
+  const cv = $("posCanvas");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 34, padR = 18, padT = 20, padB = 34;
+  const tw = W - padL - padR, th = H - padT - padB;
+  const X = t => padL + (t / 11) * tw;
+  const Y = v => padT + (1 - (v + 1) / 2) * th;
+  ctx.strokeStyle = "#1e2a3a";
+  ctx.fillStyle = "#8fa3bd";
+  ctx.font = "12px sans-serif";
+  for (let i = 0; i <= 4; i++) {
+    const v = -1 + i * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, Y(v));
+    ctx.lineTo(W - padR, Y(v));
+    ctx.stroke();
+    ctx.fillText(v.toFixed(1), 4, Y(v) + 4);
+  }
+  ctx.fillText("場所 →", W - padR - 40, H - 8);
+  const curves = [
+    { f: t => Math.sin(2 * Math.PI * t / 6), c: "#22d3ee", label: "サイン波（周期6）" },
+    { f: t => Math.cos(2 * Math.PI * t / 6), c: "#7c6cff", label: "コサイン波（周期6）" },
+    { f: t => Math.sin(2 * Math.PI * t / 3), c: "#fbbf24", label: "サイン波（周期3）" }
+  ];
+  for (const cu of curves) {
+    ctx.strokeStyle = cu.c;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let t = 0; t <= 11; t += 0.25) {
+      const x = X(t), y = Y(cu.f(t));
+      if (t === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const pos = parseInt($("posSlider").value);
+  ctx.strokeStyle = "rgba(232,238,247,0.6)";
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(X(pos), padT);
+  ctx.lineTo(X(pos), H - padB);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for (const cu of curves) {
+    ctx.fillStyle = cu.c;
+    ctx.beginPath();
+    ctx.arc(X(pos), Y(cu.f(pos)), 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#e8eef7";
+  ctx.fillText("いま選んでいる場所: 位置" + pos, padL, H - 8);
+}
+
+function drawWpeHeatmap() {
+  const cv = $("wpeCanvas");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 56, padT = 12;
+  const cellW = (W - padL - 14) / 32, cellH = (H - padT - 14) / TL;
+  let vmax = 1e-9;
+  for (let t = 0; t < TL; t++) for (let i = 0; i < D; i++) vmax = Math.max(vmax, Math.abs(P.wpe[t][i]));
+  ctx.font = "12px sans-serif";
+  ctx.fillStyle = "#8fa3bd";
+  for (let t = 0; t < TL; t++) ctx.fillText("位置" + t, 6, padT + t * cellH + cellH * 0.7);
+  for (let t = 0; t < TL; t++) for (let i = 0; i < D; i++) {
+    const v = P.wpe[t][i];
+    const a = Math.min(1, Math.abs(v) / vmax);
+    const c = v >= 0 ? "34,211,238" : "124,108,255";
+    ctx.fillStyle = "rgba(" + c + "," + (0.08 + 0.92 * a) + ")";
+    ctx.fillRect(padL + i * cellW + 0.5, padT + t * cellH + 0.5, cellW - 1, cellH - 1);
+  }
+}
+
+function updatePosition() {
+  drawPosCurves();
+  drawWpeHeatmap();
+  const ch = Array.from($("posChar").value)[0] || "ん";
+  const id = TOK[ch];
+  const pa = parseInt($("posA").value), pb = parseInt($("posB").value);
+  if (id === undefined) {
+    $("posMsg").textContent = "この文字は学習データにないので表示できません。ひらがなで入力してみてね。";
+    return;
+  }
+  const base = P.wte[id];
+  const va = new Float64Array(D), vb = new Float64Array(D);
+  for (let i = 0; i < D; i++) { va[i] = base[i] + P.wpe[pa][i]; vb[i] = base[i] + P.wpe[pb][i]; }
+  let vmax = 1e-9;
+  for (let i = 0; i < D; i++) vmax = Math.max(vmax, Math.abs(va[i]), Math.abs(vb[i]));
+  renderBars("posBarsA", va, vmax);
+  renderBars("posBarsB", vb, vmax);
+  const sim = cosine(va, vb);
+  $("posMsg").textContent = "「" + ch + "」は場所" + pa + "と場所" + pb + "で これだけ数字がちがう（似ている度 " + sim.toFixed(2) + "）。同じ文字なのに、場所で別のものになるのです。";
+}
+
+let attGrid = null, attChars = [];
+
+function drawAttention() {
+  const text = $("attText").value;
+  const layer = parseInt($("attLayer").value);
+  const headMode = $("attHead").value;
+  const chars = Array.from(text);
+  if (chars.length === 0) { chars.push(" "); }
+  const toks = [];
+  let skipped = 0;
+  for (const ch of chars) {
+    const id = TOK[ch];
+    if (id === undefined) { skipped++; toks.push(TOK[" "]); }
+    else toks.push(id);
+  }
+  const extra = toks.length > TL;
+  if (toks.length > TL) toks.length = TL;
+  const T = toks.length;
+  $("attWarn").textContent = (skipped > 0 ? "ひらがな以外の文字は「空白」として表示しています。 " : "") +
+    (extra ? "長いので最初の12文字だけ表示しています。 " : "");
+  const fwd = forward(P, [toks]);
+  const probs = fwd.caches[layer].probs[0];
+  const grid = [];
+  if (headMode === "avg") {
+    for (let i = 0; i < T; i++) {
+      grid.push(new Float64Array(T));
+      for (let j = 0; j <= i; j++) {
+        let s = 0;
+        for (let hd = 0; hd < H; hd++) s += probs[hd][i][j];
+        grid[i][j] = s / H;
+      }
+    }
+  } else {
+    const hd = parseInt(headMode);
+    for (let i = 0; i < T; i++) grid.push(probs[hd][i].slice());
+  }
+  attGrid = grid;
+  attChars = toks.map(id => VOCAB[id]);
+
+  const cv = $("attCanvas");
+  const cell = 38, padL = 36, padT = 32;
+  const W = padL + T * cell + 10, H = padT + T * cell + 10;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  cv.style.width = W + "px";
+  cv.style.height = H + "px";
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = "14px sans-serif";
+  ctx.fillStyle = "#8fa3bd";
+  ctx.textAlign = "center";
+  for (let i = 0; i < T; i++) {
+    ctx.fillText(attChars[i], padL + i * cell + cell / 2, 20);
+    ctx.textAlign = "right";
+    ctx.fillText(attChars[i], padL - 8, padT + i * cell + cell / 2 + 4);
+    ctx.textAlign = "center";
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#5b6b82";
+  ctx.font = "11px sans-serif";
+  ctx.fillText("注目する側 →", padL, H - 2);
+  ctx.save();
+  ctx.translate(8, padT + T * cell - 4);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("注目される側 →", 0, 0);
+  ctx.restore();
+  for (let i = 0; i < T; i++) for (let j = 0; j < T; j++) {
+    const x = padL + j * cell, y = padT + i * cell;
+    if (j > i) {
+      ctx.fillStyle = "#0a1120";
+      ctx.fillRect(x, y, cell, cell);
+      continue;
+    }
+    const v = grid[i][j];
+    ctx.fillStyle = v <= 0.001 ? "#101826" : "rgba(" + (34 + 90 * v) + "," + (211 - 103 * v) + "," + (238 - 132 * v) + "," + (0.2 + 0.8 * v) + ")";
+    ctx.fillRect(x, y, cell, cell);
+    if (v > 0.18) {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(Math.round(v * 100) + "%", x + cell / 2, y + cell / 2 + 4);
+      ctx.textAlign = "left";
+    }
+  }
+  ctx.strokeStyle = "#1e2a3a";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= T; i++) {
+    ctx.beginPath();
+    ctx.moveTo(padL + i * cell, padT);
+    ctx.lineTo(padL + i * cell, padT + T * cell);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + i * cell);
+    ctx.lineTo(padL + T * cell, padT + i * cell);
+    ctx.stroke();
+  }
+  const list = $("attTopList");
+  list.innerHTML = "";
+  for (let i = 0; i < T; i++) {
+    let best = 0;
+    for (let j = 0; j <= i; j++) if (grid[i][j] > grid[i][best]) best = j;
+    const row = document.createElement("div");
+    row.className = "rankrow";
+    const w = Math.round(grid[i][best] * 100);
+    row.innerHTML = '<span class="char">' + attChars[i] + '</span>' +
+      'は「<b>' + attChars[best] + '</b>」に注目' +
+      '<div class="track"><div class="fill" style="width:' + w + '%"></div></div>' +
+      '<span class="val">' + Math.round(grid[i][best] * 100) + '%</span>';
+    list.appendChild(row);
+  }
+}
+
+const tip = $("tooltip");
+$("attCanvas").addEventListener("mousemove", ev => {
+  if (!attGrid) return;
+  const cv = $("attCanvas");
+  const rect = cv.getBoundingClientRect();
+  const cell = 38, padL = 36, padT = 32;
+  const dpr = cv.width / rect.width;
+  const x = (ev.clientX - rect.left) * dpr - padL;
+  const y = (ev.clientY - rect.top) * dpr - padT;
+  const j = Math.floor(x / cell), i = Math.floor(y / cell);
+  const T = attGrid.length;
+  if (i < 0 || i >= T || j < 0 || j >= T) { tip.style.display = "none"; return; }
+  if (j > i) {
+    tip.textContent = "未来の文字は見えない（注目できない）";
+  } else {
+    tip.textContent = "「" + attChars[i] + "」は「" + attChars[j] + "」に " + Math.round(attGrid[i][j] * 100) + "% 注目";
+  }
+  tip.style.display = "block";
+  tip.style.left = (ev.clientX + 14) + "px";
+  tip.style.top = (ev.clientY + 14) + "px";
+});
+$("attCanvas").addEventListener("mouseleave", () => { tip.style.display = "none"; });
+
+function drawLossChart() {
+  const cv = $("lossChart");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 46, padR = 14, padT = 14, padB = 30;
+  const tw = W - padL - padR, th = H - padT - padB;
+  let yMax = Math.max(3.6, ...lossHistory, 0.1);
+  const Y = v => padT + (1 - v / yMax) * th;
+  ctx.strokeStyle = "#1e2a3a";
+  ctx.fillStyle = "#8fa3bd";
+  ctx.font = "12px sans-serif";
+  for (let i = 0; i <= 4; i++) {
+    const v = yMax * i / 4;
+    ctx.beginPath();
+    ctx.moveTo(padL, Y(v));
+    ctx.lineTo(W - padR, Y(v));
+    ctx.stroke();
+    ctx.fillText(v.toFixed(1), 6, Y(v) + 4);
+  }
+  const randLine = Math.log(V);
+  if (randLine < yMax) {
+    ctx.strokeStyle = "rgba(251,191,36,0.7)";
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padL, Y(randLine));
+    ctx.lineTo(W - padR, Y(randLine));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillText("デタラメ予測ライン " + randLine.toFixed(1), padL + 6, Y(randLine) - 6);
+  }
+  if (lossHistory.length > 1) {
+    ctx.strokeStyle = "#22d3ee";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < lossHistory.length; i++) {
+      const x = padL + (i / (STEPS - 1)) * tw;
+      const y = Y(Math.min(lossHistory[i], yMax));
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  if (lossHistory.length) {
+    ctx.fillStyle = "#7c6cff";
+    const x = padL + ((lossHistory.length - 1) / (STEPS - 1)) * tw;
+    const y = Y(Math.min(lossHistory[lossHistory.length - 1], yMax));
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#8fa3bd";
+  ctx.fillText("0", padL - 8, H - 12);
+  ctx.fillText("学習ステップ →", padL + tw - 90, H - 12);
+}
+
+function addSampleLog() {
+  const box = $("sampleLog");
+  const text = generate(P, [TOK["こ"], TOK["ん"], TOK["に"], TOK["ち"], TOK["は"]], 14, 0.7);
+  const div = document.createElement("div");
+  div.innerHTML = "<b>step " + trainStep + "</b>: 「こんにちは」→ " + text;
+  box.insertBefore(div, box.firstChild);
+  while (box.children.length > 6) box.removeChild(box.lastChild);
+}
+
+function updateStatUI() {
+  $("curStep").textContent = trainStep;
+  $("curLoss").textContent = lossHistory.length ? lossHistory[lossHistory.length - 1].toFixed(2) : "--";
+  drawLossChart();
+}
+
+function doChunk() {
+  if (!training) return;
+  const CHUNK = 12;
+  for (let i = 0; i < CHUNK && training && trainStep < STEPS; i++) {
+    const { x, y } = sampleBatch();
+    const lr = LR0 * 0.5 * (1 + Math.cos(Math.PI * (trainStep + 1) / STEPS));
+    const fwd = forward(P, x);
+    const { G, loss } = backward(P, fwd, x, y);
+    const n = gradNorm(G);
+    if (n > 1) scaleGrads(G, 1 / n);
+    adamUpdate(P, G, m, vv, lr, trainStep + 1);
+    trainStep++;
+    lossHistory.push(loss);
+  }
+  updateStatUI();
+  updateStatus();
+  if (trainStep - lastSampleStep >= 80) {
+    lastSampleStep = trainStep;
+    addSampleLog();
+  }
+  if (trainStep >= STEPS) {
+    training = false;
+    $("btnStop").disabled = true;
+    updateStatus();
+    refreshDemos();
+    return;
+  }
+  requestAnimationFrame(doChunk);
+}
+
+function startTraining() {
+  stopTraining();
+  P = initParams();
+  m = {};
+  vv = {};
+  trainStep = 0;
+  lossHistory = [];
+  lastSampleStep = -999;
+  $("sampleLog").innerHTML = '<div class="muted">学習を始めると、ここに「その時点の実力」が記録されます。</div>';
+  $("genOutput").textContent = "（学習中です。少し待ってから生成してみてね）";
+  training = true;
+  $("btnStop").disabled = false;
+  updateStatUI();
+  updateStatus();
+  requestAnimationFrame(doChunk);
+}
+
+function stopTraining() {
+  training = false;
+  $("btnStop").disabled = true;
+  updateStatus();
+}
+
+function refreshDemos() {
+  updateEmbedding();
+  updatePosition();
+  drawAttention();
+  updateStatus();
+}
+
+function doGenerate(again) {
+  const seed = $("genSeed").value;
+  const temp = parseFloat($("tempRange").value);
+  const toks = [];
+  for (const ch of Array.from(seed)) {
+    const id = TOK[ch];
+    toks.push(id === undefined ? TOK[" "] : id);
+  }
+  if (toks.length === 0) toks.push(TOK[" "]);
+  const text = generate(P, toks, 22, temp);
+  const out = $("genOutput");
+  out.innerHTML = '<span class="seed">' + seed + '</span>' + text.slice(seed.length);
+  const cur = lossHistory.length ? lossHistory[lossHistory.length - 1].toFixed(2) : "--";
+  $("genNote").textContent = (trainStep >= STEPS ? "学習済みモデルで生成しました。" : "まだ学習途中（ロス " + cur + "）です。学習が終わると結果が変わります。") +
+    " 温度 " + temp.toFixed(2) + "（低い=堅実、高い=自由）";
+}
+
+$("embChar1").addEventListener("input", updateEmbedding);
+$("embChar2").addEventListener("input", updateEmbedding);
+$("posSlider").addEventListener("input", updatePosition);
+$("posChar").addEventListener("input", updatePosition);
+$("posA").addEventListener("change", updatePosition);
+$("posB").addEventListener("change", updatePosition);
+$("attText").addEventListener("input", drawAttention);
+$("attLayer").addEventListener("change", drawAttention);
+$("attHead").addEventListener("change", drawAttention);
+$("tempRange").addEventListener("input", () => { $("tempVal").textContent = parseFloat($("tempRange").value).toFixed(2); });
+$("genSeed").addEventListener("keydown", ev => { if (ev.key === "Enter") doGenerate(); });
+
+updateEmbedding();
+updatePosition();
+drawAttention();
+updateStatUI();
+updateStatus();
+setTimeout(() => {
+  training = true;
+  $("btnStop").disabled = false;
+  updateStatus();
+  requestAnimationFrame(doChunk);
+}, 600);
+</script>
+
+</body>
+</html>
