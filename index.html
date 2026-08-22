@@ -56,6 +56,16 @@ nav a.navlink:hover { color: var(--accent2); }
 }
 .chip.done { color: var(--good); border-color: rgba(52, 211, 153, 0.4); }
 .chip.idle { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); }
+.gaugewrap { display: flex; justify-content: center; margin-top: 12px; }
+.gauge {
+  width: 280px; height: 10px; border-radius: 999px;
+  background: var(--card2); border: 1px solid var(--line); overflow: hidden;
+}
+.gaugefill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  border-radius: 999px; transition: width 0.15s ease;
+}
 
 .card {
   background: var(--card);
@@ -201,6 +211,7 @@ footer { text-align: center; padding: 30px 20px 60px; color: var(--muted); font-
     <h1>Transformerを触って学ぶ</h1>
     <p class="sub">このページの中には、<b>本物のAI（ミニTransformer）</b>が入っています。<br>ブラウザ上で学習させて、じっさいに文字を生成させてみましょう。</p>
     <span class="chip idle" id="statusChip">▶ モデル: 準備中…</span>
+    <div class="gaugewrap"><div class="gauge"><div class="gaugefill" id="statusFill"></div></div></div>
     <div class="btnrow" style="justify-content:center">
       <button class="btn" onclick="document.getElementById('intro').scrollIntoView()">はじめてみる</button>
       <button class="btn ghost" onclick="document.getElementById('step4').scrollIntoView()">学習ページへジャンプ</button>
@@ -976,16 +987,25 @@ const $ = id => document.getElementById(id);
 
 function updateStatus() {
   const chip = $("statusChip");
+  const fill = $("statusFill");
   const cur = lossHistory.length ? lossHistory[lossHistory.length - 1] : null;
+  const pct = Math.min(100, Math.round(trainStep / STEPS * 100));
   if (training) {
     chip.className = "chip";
-    chip.textContent = "⚙ 学習中… ロス " + (cur !== null ? cur.toFixed(2) : "--");
+    chip.textContent = "⚙ 学習中… " + pct + "%（ロス " + (cur !== null ? cur.toFixed(2) : "--") + "）";
+    fill.style.width = pct + "%";
   } else if (trainStep >= STEPS) {
     chip.className = "chip done";
     chip.textContent = "✓ 学習完了（ロス " + (cur !== null ? cur.toFixed(2) : "--") + "）";
+    fill.style.width = "100%";
+  } else if (lossHistory.length === 0) {
+    chip.className = "chip idle";
+    chip.textContent = "▶ モデル: 準備中…";
+    fill.style.width = "0%";
   } else {
     chip.className = "chip idle";
-    chip.textContent = "▶ モデル: 学習待ち";
+    chip.textContent = "▶ モデル: 学習待ち（" + pct + "%）";
+    fill.style.width = pct + "%";
   }
 }
 
