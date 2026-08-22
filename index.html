@@ -402,7 +402,7 @@ footer { text-align: center; padding: 30px 20px 60px; color: var(--muted); font-
         <h4>学習のようす（ロス・チャート）</h4>
         <div class="statrow">
           <div class="stat"><span class="num" id="curLoss">--</span><span class="lbl">現在のロス</span></div>
-          <div class="stat"><span class="num" id="curStep">0</span><span class="lbl">/ 800 ステップ</span></div>
+          <div class="stat"><span class="num" id="curStep">0</span><span class="lbl">/ 400 ステップ</span></div>
         </div>
         <div class="canvaswrap">
           <canvas id="lossChart" class="demo" width="880" height="300"></canvas>
@@ -509,7 +509,7 @@ const TOK = {};
 for (let i = 0; i < VOCAB.length; i++) TOK[VOCAB[i]] = i;
 const TRAIN_TOKENS = Array.from(TRAIN_TEXT).map(c => TOK[c]);
 const V = VOCAB.length;
-const D = 32, H = 2, DH = 16, L = 2, TL = 12, BATCH = 8, EPS = 1e-5, STEPS = 800, LR0 = 1.5e-3;
+const D = 32, H = 2, DH = 16, L = 2, TL = 12, BATCH = 4, EPS = 1e-5, STEPS = 400, LR0 = 1.5e-3;
 
 function zeros(r, c) {
   const a = new Array(r);
