@@ -3,6 +3,8 @@
 非エンジニアの方向けに、Transformerの仕組みを「触りながら」学べる学習サイトです。
 ブラウザ上で動作する本物のミニTransformer（約3万パラメータ）を、その場で学習・生成しながら仕組みを体感できます。
 
+**公開ページ: https://mooman0222.github.io/Transformer-learn/**
+
 ## 特徴
 
 - **1つのHTMLファイルだけで完結** — 外部ライブラリ・依存関係なし。保存すればオフラインでも動作
@@ -26,14 +28,14 @@ Transformerのしくみを4ステップに分解し、各ステップを操作�
 
 ```bash
 # ブラウザで開くだけ
-open transformer-learn.html
+open index.html
 ```
 
 ページ内の各セクションに沿って操作しながら読み進めてください。「学習ページへジャンプ」ボタンでSTEP 4（ミニAIの学習・生成体験）にすぐ移動できます。
 
 ## 技術概要
 
-- 単一ファイル: `transformer-learn.html`（HTML + CSS + JavaScript）
+- 単一ファイル: `index.html`（HTML + CSS + JavaScript）
 - ミニTransformerの仕様（モデルスクリプト内の定数より）:
   - 次元数 32、Attentionヘッド 2、層数 2、コンテキスト長 12
   - 学習: 800ステップ、バッチサイズ 8、ひらがなの定型文（あいさつ・感情語）で学習
