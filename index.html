@@ -1383,7 +1383,16 @@ function updateStatUI() {
   drawLossChart();
 }
 
+let chunkScheduled = false;
+
+function scheduleChunk() {
+  if (chunkScheduled) return;
+  chunkScheduled = true;
+  requestAnimationFrame(doChunk);
+}
+
 function doChunk() {
+  chunkScheduled = false;
   if (!training) return;
   const CHUNK = 12;
   try {
@@ -1404,6 +1413,12 @@ function doChunk() {
     }
   } catch (e) {
     console.error("学習処理でエラーが発生しました:", e);
+    training = false;
+    $("btnStop").disabled = true;
+    const chip = $("statusChip");
+    chip.className = "chip idle";
+    chip.textContent = "✗ 学習でエラーが発生しました（コンソールを確認してください）";
+    return;
   }
   updateStatUI();
   updateStatus();
@@ -1414,7 +1429,7 @@ function doChunk() {
     refreshDemos();
     return;
   }
-  requestAnimationFrame(doChunk);
+  scheduleChunk();
 }
 
 function startAutoTraining() {
@@ -1423,12 +1438,12 @@ function startAutoTraining() {
   training = true;
   $("btnStop").disabled = false;
   updateStatus();
-  requestAnimationFrame(doChunk);
+  scheduleChunk();
 }
 
 function resumeTrainingIfNeeded() {
   if (training && trainStep < STEPS && !document.hidden) {
-    requestAnimationFrame(doChunk);
+    scheduleChunk();
   }
 }
 
@@ -1448,7 +1463,7 @@ function startTraining() {
   $("btnStop").disabled = false;
   updateStatUI();
   updateStatus();
-  requestAnimationFrame(doChunk);
+  scheduleChunk();
 }
 
 function stopTraining() {
