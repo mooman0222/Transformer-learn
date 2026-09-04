@@ -850,7 +850,8 @@ function backward(P, fwd, x, y) {
     const lng1 = layernormBackward(dln1Y, c.hIn, bl.ln1_g, bl.ln1_b, c.ln1.means, c.ln1.invs);
     Gb.ln1_g = lng1.dg;
     Gb.ln1_b = lng1.db;
-    dh = lng1.dx;
+    // h -> h1 の残差接続: 直接経路(dh1)とLN→Attention経路(lng1.dx)の両方を足す
+    dh = addMat3(lng1.dx, dh1);
   }
   G.wte = zeros(V, D);
   G.wpe = zeros(TL, D);
@@ -973,6 +974,76 @@ function cosine(a, b) {
 }
 </script>
 
+<script id="worker-script" type="text/js-worker">
+"use strict";
+// 学習専用Worker。model-scriptと連結されて実行されるため、
+// forward/backward/generate等のモデル関数・定数を直接利用できる。
+// UIスレッドとは postMessage のみで通信し、DOMには触らない。
+let wP = null, wm = {}, wvv = {};
+let wStep = 0, wTraining = false, wLastSample = -999;
+// start/stopが連続した場合に旧スケジュール分のチャンクが
+// 新しい学習に混ざらないよう、世代カウンタで無効化する。
+let wRun = 0;
+const WCHUNK = 12;
+
+function wChunk(run) {
+  if (run !== wRun || !wTraining) return;
+  const losses = [];
+  try {
+    for (let i = 0; i < WCHUNK && wTraining && wStep < STEPS; i++) {
+      const b = sampleBatch();
+      const lr = LR0 * 0.5 * (1 + Math.cos(Math.PI * (wStep + 1) / STEPS));
+      const fwd = forward(wP, b.x);
+      const r = backward(wP, fwd, b.x, b.y);
+      const n = gradNorm(r.G);
+      if (n > 1) scaleGrads(r.G, 1 / n);
+      adamUpdate(wP, r.G, wm, wvv, lr, wStep + 1);
+      wStep++;
+      losses.push(r.loss);
+    }
+  } catch (e) {
+    postMessage({ type: "error", message: String((e && e.message) || e) });
+    wTraining = false;
+    return;
+  }
+  if (losses.length) postMessage({ type: "progress", step: wStep, losses });
+  if (wStep - wLastSample >= 80 || wStep >= STEPS) {
+    wLastSample = wStep;
+    let text = "";
+    try {
+      text = generate(wP, [TOK["こ"], TOK["ん"], TOK["に"], TOK["ち"], TOK["は"]], 14, 0.7);
+    } catch (e) { text = ""; }
+    postMessage({ type: "snapshot", step: wStep, P: wP });
+    if (text) postMessage({ type: "sample", step: wStep, text });
+  }
+  if (wStep >= STEPS) {
+    wTraining = false;
+    postMessage({ type: "done", step: wStep });
+    return;
+  }
+  setTimeout(function () { wChunk(run); }, 0);
+}
+
+onmessage = function (ev) {
+  const msg = (ev && ev.data) || {};
+  if (msg.type === "start") {
+    wP = initParams();
+    wm = {};
+    wvv = {};
+    wStep = 0;
+    wLastSample = -999;
+    wTraining = true;
+    wRun++;
+    const run = wRun;
+    postMessage({ type: "snapshot", step: 0, P: wP });
+    setTimeout(function () { wChunk(run); }, 0);
+  } else if (msg.type === "stop") {
+    wTraining = false;
+    wRun++;
+  }
+};
+</script>
+
 <script>
 "use strict";
 
@@ -984,8 +1055,16 @@ let training = false;
 let lastSampleStep = -999;
 let autoStarted = false;
 let userStopped = false;
+// Web Workerで学習する場合の管理用。Workerが使えない環境では
+// 従来どおりメインスレッドの scheduleChunk/doChunk にフォールバックする。
+let trainWorker = null;
+let useWorker = false;
 
 const $ = id => document.getElementById(id);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
 
 function updateStatus() {
   const chip = $("statusChip");
@@ -1040,6 +1119,10 @@ function updateEmbedding() {
   if (id1 === undefined || id2 === undefined) {
     $("embSim").textContent = "--";
     $("embSimNote").textContent = "この文字は学習データにないので、代わりに「空白」として表示しています。ひらがなで入力してみてね。";
+    // 古い表示が残らないよう、棒グラフとランキングをクリアする
+    $("embBars1").innerHTML = "";
+    $("embBars2").innerHTML = "";
+    $("embRank").innerHTML = "";
     return;
   }
   const v1 = P.wte[id1], v2 = P.wte[id2];
@@ -1065,7 +1148,7 @@ function updateEmbedding() {
     const row = document.createElement("div");
     row.className = "rankrow";
     const w = Math.max(4, Math.round(Math.max(0, ranked[i][1]) * 100));
-    row.innerHTML = '<span class="char">' + ranked[i][0] + '</span>' +
+    row.innerHTML = '<span class="char">' + escapeHtml(ranked[i][0]) + '</span>' +
       '<div class="track"><div class="fill" style="width:' + w + '%"></div></div>' +
       '<span class="val">' + ranked[i][1].toFixed(2) + '</span>';
     box.appendChild(row);
@@ -1162,6 +1245,9 @@ function updatePosition() {
   const pa = parseInt($("posA").value), pb = parseInt($("posB").value);
   if (id === undefined) {
     $("posMsg").textContent = "この文字は学習データにないので表示できません。ひらがなで入力してみてね。";
+    // 古い表示が残らないよう、棒グラフをクリアする
+    $("posBarsA").innerHTML = "";
+    $("posBarsB").innerHTML = "";
     return;
   }
   const base = P.wte[id];
@@ -1237,11 +1323,13 @@ function drawAttention() {
   ctx.textAlign = "left";
   ctx.fillStyle = "#5b6b82";
   ctx.font = "11px sans-serif";
-  ctx.fillText("注目する側 →", padL, ch - 2);
+  // grid[i][j]を行=i(注目する側=縦)、列=j(注目される側=横)に描いているため、
+  // 横軸=注目される側、縦軸=注目する側と表記する。
+  ctx.fillText("注目される側 →", padL, ch - 2);
   ctx.save();
   ctx.translate(8, padT + T * cell - 4);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("注目される側 →", 0, 0);
+  ctx.fillText("注目する側 →", 0, 0);
   ctx.restore();
   for (let i = 0; i < T; i++) for (let j = 0; j < T; j++) {
     const x = padL + j * cell, y = padT + i * cell;
@@ -1281,8 +1369,8 @@ function drawAttention() {
     const row = document.createElement("div");
     row.className = "rankrow";
     const w = Math.round(grid[i][best] * 100);
-    row.innerHTML = '<span class="char">' + attChars[i] + '</span>' +
-      'は「<b>' + attChars[best] + '</b>」に注目' +
+    row.innerHTML = '<span class="char">' + escapeHtml(attChars[i]) + '</span>' +
+      'は「<b>' + escapeHtml(attChars[best]) + '</b>」に注目' +
       '<div class="track"><div class="fill" style="width:' + w + '%"></div></div>' +
       '<span class="val">' + Math.round(grid[i][best] * 100) + '%</span>';
     list.appendChild(row);
@@ -1295,9 +1383,10 @@ $("attCanvas").addEventListener("mousemove", ev => {
   const cv = $("attCanvas");
   const rect = cv.getBoundingClientRect();
   const cell = 38, padL = 36, padT = 32;
-  const dpr = cv.width / rect.width;
-  const x = (ev.clientX - rect.left) * dpr - padL;
-  const y = (ev.clientY - rect.top) * dpr - padT;
+  // rectはCSSピクセル基準なので、padL/cellもCSSピクセルで計算する(DPRで割らない)。
+  // cv.widthはdeviceピクセル(幅×DPR)のため、ツールチップ判定には使わない。
+  const x = ev.clientX - rect.left - padL;
+  const y = ev.clientY - rect.top - padT;
   const j = Math.floor(x / cell), i = Math.floor(y / cell);
   const T = attGrid.length;
   if (i < 0 || i >= T || j < 0 || j >= T) { tip.style.display = "none"; return; }
@@ -1368,13 +1457,17 @@ function drawLossChart() {
   ctx.fillText("学習ステップ →", padL + tw - 90, H - 12);
 }
 
-function addSampleLog() {
+function pushSampleLog(step, text) {
   const box = $("sampleLog");
-  const text = generate(P, [TOK["こ"], TOK["ん"], TOK["に"], TOK["ち"], TOK["は"]], 14, 0.7);
   const div = document.createElement("div");
-  div.innerHTML = "<b>step " + trainStep + "</b>: 「こんにちは」→ " + text;
+  div.innerHTML = "<b>step " + step + "</b>: 「こんにちは」→ " + escapeHtml(text);
   box.insertBefore(div, box.firstChild);
   while (box.children.length > 6) box.removeChild(box.lastChild);
+}
+
+function addSampleLog() {
+  const text = generate(P, [TOK["こ"], TOK["ん"], TOK["に"], TOK["ち"], TOK["は"]], 14, 0.7);
+  pushSampleLog(trainStep, text);
 }
 
 function updateStatUI() {
@@ -1432,28 +1525,106 @@ function doChunk() {
   scheduleChunk();
 }
 
+function handleWorkerMessage(ev) {
+  const msg = (ev && ev.data) || {};
+  if (msg.type === "progress") {
+    trainStep = msg.step;
+    if (msg.losses && msg.losses.length) {
+      for (const v of msg.losses) lossHistory.push(v);
+    }
+    updateStatUI();
+    updateStatus();
+  } else if (msg.type === "snapshot") {
+    trainStep = msg.step;
+    if (msg.P) {
+      P = msg.P;
+      try { updateEmbedding(); } catch (e) { console.error("Embedding描画エラー:", e); }
+      try { updatePosition(); } catch (e) { console.error("位置情報描画エラー:", e); }
+      try { drawAttention(); } catch (e) { console.error("Attention描画エラー:", e); }
+    }
+    updateStatUI();
+    updateStatus();
+  } else if (msg.type === "sample") {
+    pushSampleLog(msg.step, msg.text);
+  } else if (msg.type === "done") {
+    trainStep = msg.step;
+    training = false;
+    $("btnStop").disabled = true;
+    updateStatUI();
+    refreshDemos();
+  } else if (msg.type === "error") {
+    console.error("学習Workerでエラーが発生しました:", msg.message);
+    // Workerが使えない・壊れた場合はメインスレッド学習にフォールバックする
+    useWorker = false;
+    try { if (trainWorker) trainWorker.terminate(); } catch (e) { /* ignore */ }
+    trainWorker = null;
+    if (training && trainStep < STEPS) scheduleChunk();
+    else {
+      training = false;
+      $("btnStop").disabled = true;
+      const chip = $("statusChip");
+      chip.className = "chip idle";
+      chip.textContent = "✗ 学習でエラーが発生しました（コンソールを確認してください）";
+    }
+  }
+}
+
+function setupTrainWorker() {
+  try {
+    if (typeof Worker === "undefined") return false;
+    const modelSrc = document.getElementById("model-script").textContent;
+    const workerSrc = document.getElementById("worker-script").textContent;
+    const blob = new Blob([modelSrc + "\n" + workerSrc], { type: "text/javascript" });
+    const url = URL.createObjectURL(blob);
+    const w = new Worker(url);
+    w.onmessage = handleWorkerMessage;
+    w.onerror = function (e) {
+      console.error("学習Workerの起動に失敗しました。メインスレッドにフォールバックします:", e);
+      handleWorkerMessage({ data: { type: "error", message: (e && e.message) || "Worker error" } });
+    };
+    trainWorker = w;
+    useWorker = true;
+    return true;
+  } catch (e) {
+    console.error("Workerを作成できないためメインスレッドで学習します:", e);
+    trainWorker = null;
+    useWorker = false;
+    return false;
+  }
+}
+
 function startAutoTraining() {
   if (autoStarted || userStopped || trainStep >= STEPS) return;
   autoStarted = true;
   training = true;
   $("btnStop").disabled = false;
   updateStatus();
-  scheduleChunk();
+  if (useWorker && trainWorker) trainWorker.postMessage({ type: "start" });
+  else scheduleChunk();
 }
 
 function resumeTrainingIfNeeded() {
+  // Worker学習中はバックグラウンドでも継続するため再スケジュール不要。
+  // メインスレッド学習時のみrAFを再開する。
+  if (useWorker) return;
   if (training && trainStep < STEPS && !document.hidden) {
     scheduleChunk();
   }
 }
 
 function startTraining() {
+  const wasWorker = useWorker && trainWorker;
   stopTraining();
   userStopped = false;
   autoStarted = true;
-  P = initParams();
-  m = {};
-  vv = {};
+  // Worker学習ではパラメータ実体はWorker側で初期化され、
+  // snapshotメッセージでメイン側のPに反映される。
+  // フォールバック時は従来どおりメイン側で初期化する。
+  if (!wasWorker) {
+    P = initParams();
+    m = {};
+    vv = {};
+  }
   trainStep = 0;
   lossHistory = [];
   lastSampleStep = -999;
@@ -1463,12 +1634,16 @@ function startTraining() {
   $("btnStop").disabled = false;
   updateStatUI();
   updateStatus();
-  scheduleChunk();
+  if (wasWorker) trainWorker.postMessage({ type: "start" });
+  else scheduleChunk();
 }
 
 function stopTraining() {
   training = false;
   userStopped = true;
+  if (useWorker && trainWorker) {
+    try { trainWorker.postMessage({ type: "stop" }); } catch (e) { /* ignore */ }
+  }
   $("btnStop").disabled = true;
   updateStatus();
 }
@@ -1491,7 +1666,10 @@ function doGenerate(again) {
   if (toks.length === 0) toks.push(TOK[" "]);
   const text = generate(P, toks, 22, temp);
   const out = $("genOutput");
-  out.innerHTML = '<span class="seed">' + seed + '</span>' + text.slice(seed.length);
+  // seedはユーザ入力なので必ずエスケープする(XSS対策)。
+  // 生成文は語彙内の文字のみだが念のためエスケープする。
+  const seedLen = Array.from(seed).length;
+  out.innerHTML = '<span class="seed">' + escapeHtml(seed) + '</span>' + escapeHtml(text.slice(seedLen));
   const cur = lossHistory.length ? lossHistory[lossHistory.length - 1].toFixed(2) : "--";
   $("genNote").textContent = (trainStep >= STEPS ? "学習済みモデルで生成しました。" : "まだ学習途中（ロス " + cur + "）です。学習が終わると結果が変わります。") +
     " 温度 " + temp.toFixed(2) + "（低い=堅実、高い=自由）";
@@ -1514,6 +1692,9 @@ try { updatePosition(); } catch (e) { console.error("位置情報描画エラー
 try { drawAttention(); } catch (e) { console.error("Attention描画エラー:", e); }
 try { updateStatUI(); } catch (e) { console.error("ロスチャート描画エラー:", e); }
 try { updateStatus(); } catch (e) { console.error("ステータス表示エラー:", e); }
+// 学習用Workerを単一ファイル内のBlobから起動する(GitHub Pages・file://対応)。
+// 失敗時は従来のメインスレッド学習にフォールバックする。
+try { setupTrainWorker(); } catch (e) { console.error("Worker初期化エラー:", e); }
 setTimeout(startAutoTraining, 600);
 setInterval(() => {
   if (!autoStarted && !userStopped && trainStep < STEPS && document.readyState === "complete") {

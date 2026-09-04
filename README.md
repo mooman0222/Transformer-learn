@@ -36,6 +36,7 @@ open index.html
 ## 技術概要
 
 - 単一ファイル: `index.html`（HTML + CSS + JavaScript）
+- 学習は Web Worker（Blob生成のため単一ファイルのまま）で実行し、UIの固まりを防止。Workerが使えない環境ではメインスレッド学習にフォールバック
 - ミニTransformerの仕様（モデルスクリプト内の定数より）:
   - 次元数 32、Attentionヘッド 2、層数 2、コンテキスト長 12
   - 学習: 800ステップ、バッチサイズ 8、ひらがなの定型文（あいさつ・感情語）で学習
